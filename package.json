@@ -2,8 +2,8 @@
   "name": "lid",
   "version": "1.0.0",
   "description": "lid the logger",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "types.ts",
   "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

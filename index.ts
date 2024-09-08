@@ -11,13 +11,10 @@ export class lid{
     LevelCount:number=0;
     private options:Options;
     private tcpConnections;
-    private files;
+    private files:string|string[]='';
+
     constructor(level:LevelArgs[],options:Options={},SecretKey:string=""){
         
-        function isIterable(obj: any): boolean {
-            return obj != null && typeof obj[Symbol.iterator] === 'function';
-        }
-
         this.levels=[];
         for(const i of level){
             
@@ -52,7 +49,7 @@ export class lid{
 
         if(options.tcpConnections){
             this.tcpConnections=[];
-            if(isIterable(options)){
+            if(this.isIterable(options)){
                 //@ts-ignore
                 for (const tcpConnection of options.tcpConnections) {
                     this.tcpConnections.push(new tcp(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey));
@@ -64,10 +61,10 @@ export class lid{
         }
 
         if(options.files){
-            if(isIterable(options.files)){
+            if(this.isIterable(options.files)){
                 this.files=options.files;
             }else{
-                this.files=[options.files];
+                this.files=[...options.files];
             }
         }
 
@@ -84,11 +81,11 @@ export class lid{
             for (const levels of this.levels) {
                 if(typeof level==="number"){
                     if(levels.level===level){
-                        LoggingLevel=levels;
+                        LoggingLevel=structuredClone(levels);
                     }
                 }else if(typeof level==="string"){
                     if(levels.lvlName===level){
-                        LoggingLevel=levels;
+                        LoggingLevel=structuredClone(levels);
                 }
             }
         }
@@ -156,7 +153,131 @@ export class lid{
         }
     }
 
-    writefiles(){
+    writefiles(lvlName:string,LvlColor:string,message:string,tags:tag[]=[],args:LogArgs){
+        if(!this.files){
+            return;
+        }
+
+        function WritefilesTxt(filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
+            if(filesAppendMode){
+                fs.readFile(filePath).then((fileCurrentdata)=>{
+                    const fileContent=Buffer.from(fileCurrentdata).toString('ascii');
+                    if(fileContent.length===0){
+                        WritefilesTxt(filePath,levelName,message,tags,false);
+                    }
+
+                    const fileContentList=fileContent.split('\n');
+                    
+                    let fileContentListCursor=fileContentList.length;
+                    
+                    const latestDateRegex = /^\d{4}-\d{2}-\d{2}\u00A0:$/;
+                    const latestTimeRegex  =/^\t\d{2}::\d{2}\u00A0:$/
+                    let latestDateString:string;
+                    let latestTimeString:string;
+
+                    while(!latestDateRegex.test(fileContentList[fileContentListCursor])){   
+                        fileContentListCursor--;
+                    }
+
+                    latestDateString=fileContentList[fileContentListCursor].slice(0,fileContentList[fileContentListCursor].length-2);
+
+                    while(!latestTimeRegex.test(fileContentList[fileContentListCursor])){
+                        fileContentListCursor++;
+                    }
+                    
+                    if(fileContentListCursor===0||fileContentListCursor===fileContentList.length){
+                        WritefilesTxt(filePath,levelName,message,tags,false);
+                    }
+
+                    latestTimeString=fileContentList[fileContentListCursor].slice(0,fileContentList[fileContentListCursor].length-2);
+
+                    const latestDateTime=new Date(latestDateString);
+                    const [hours,minutes]=latestTimeString.split('::').map(Number);
+                    latestDateTime.setHours(hours);
+                    latestDateTime.setMinutes(minutes);
+                    
+                    const currentDateTime=new Date();
+
+                    const formattedDate=new Date(currentDateTime);
+                    formattedDate.setHours(0,0,0,0);
+                    
+                    //within same date
+                    if(currentDateTime.getTime()>=formattedDate.getTime()&&currentDateTime.getTime()<formattedDate.getTime()+86400000){
+                        if(currentDateTime.getHours()===latestDateTime.getHours()){
+                            //same time
+                            let appendingData=`\t\t[${currentDateTime.toISOString()}] ${levelName} : ${message} ; { `;
+                            
+                            for (const tag of tags) {
+                                appendingData=appendingData.concat(`${tag.tagName} : ${tag.tagMessage} , `)
+                            }
+                            
+                            appendingData=appendingData.concat(' }\n');
+                        
+                            fs.appendFile(filePath,appendingData);
+                        
+                        }else{
+                            //different time
+                            let appendingData=`\t${currentDateTime.getHours()}::${currentDateTime.getMinutes()}\u00A0:\n`;
+                            appendingData=appendingData.concat(`\t\t[${currentDateTime.toISOString()}] ${levelName} : ${message} ; { `);
+
+                            for (const tag of tags) {
+                                appendingData=appendingData.concat(`${tag.tagName} : ${tag.tagMessage} , `)
+                            }
+                            appendingData=appendingData.concat(' }\n');
+                        
+                            fs.appendFile(filePath,appendingData);
+                        
+                        }
+                    }else{
+                        // with in different date
+                        let appendingData=`${currentDateTime.getFullYear()}-${currentDateTime.getMonth().toString().padStart(2,'0')}-${currentDateTime.getDate().toString().padStart(2,'0')}\u00A0:\n`;
+                        appendingData=appendingData.concat(`\t${currentDateTime.getHours()}::${currentDateTime.getMinutes()}\u00A0:\n`);
+                        appendingData=appendingData.concat(`\t\t[${currentDateTime.toISOString()}] ${levelName} : ${message} ; { `);
+
+                        for (const tag of tags) {
+                            appendingData=appendingData.concat(`${tag.tagName} : ${tag.tagMessage} , `)
+                        }
+
+                        appendingData=appendingData.concat(' }\n');
+                        
+                        fs.appendFile(filePath,appendingData);
+
+                    };
+                    
+
+                });
+            }else{
+                const currentDateTime=new Date();
+
+                let appendingData=`${currentDateTime.getFullYear()}-${currentDateTime.getMonth().toString().padStart(2,'0')}-${currentDateTime.getDate().toString().padStart(2,'0')}\u00A0:\n`;
+                appendingData=appendingData.concat(`\t${currentDateTime.getHours()}::${currentDateTime.getMinutes()}\u00A0:\n`);
+                appendingData=appendingData.concat(`\t\t[${currentDateTime.toISOString()}] ${levelName} : ${message} ; { `);
+
+                for (const tag of tags) {
+                    appendingData=appendingData.concat(`${tag.tagName} : ${tag.tagMessage} , `);
+                }
+
+                appendingData=appendingData.concat(' }\n');
+                
+                fs.writeFile(filePath,appendingData);
+            }
+        }    
+        
+
+        if(this.isIterable(this.files)){
+            for (const filePath of this.files) {
+                if(filePath===args.excludeFiles){continue};
+                //add files eclusion list here
+                if(filePath.slice(-3)==="txt"){
+                    WritefilesTxt(filePath,lvlName,message,tags,args.filesAppendMode);
+                }
+            }
+        }else{
+            if(this.files.slice(-3)==="txt"){
+                //@ts-ignore
+                WritefilesTxt(this.files,lvlName,message,tags,args.filesAppendMode);
+            }
+        }
 
     }
 
@@ -174,10 +295,14 @@ export class lid{
         const f = (n:number) => {
             const k = (n + h / 30) % 12;
             const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-            return Math.round(255 * color).toString(16).padStart(2, '0');   // convert to Hex and prefix "0" if needed
+            return Math.round(255 * color).toString(16).padStart(2, '0');
         };
 
         return `#${f(0)}${f(8)}${f(4)}`;
-      }
+    }
+
+    private isIterable(obj: any): boolean {
+        return obj != null && typeof obj[Symbol.iterator] === 'function';
+    }
 
 }

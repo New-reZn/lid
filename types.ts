@@ -11,7 +11,7 @@ export type Level = {
     lvlcolor: string,
     level: number,
     tags: tag[],
-    tagsCount: 0
+    tagsCount: number
 };
 
 export type LevelArgs = {
@@ -44,5 +44,6 @@ export type Options = {
 
 export type LogArgs={
     excludeConnections?:string[]|string,
-    excludeFiles?:string[]|string
+    excludeFiles?:string[]|string,
+    filesAppendMode?:boolean
 }
