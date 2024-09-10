@@ -40,10 +40,10 @@ export class tcp{
         });
     }
 
-    async sendData(message:string,IV:string) {
+    async sendData(message:string) {
         this.client.write(JSON.stringify({
             status:'sending message',
-            message:this.encrypt(message,IV)
+            message:this.encrypt(message,this.IV)
         }));
         return true;
     }

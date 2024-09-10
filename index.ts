@@ -54,11 +54,15 @@ export class lid{
             if(this.isIterable(options)){
                 //@ts-ignore
                 for (const tcpConnection of options.tcpConnections) {
-                    this.tcpConnections.push(new tcp(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey));
+                    const tcpObject=new tcp(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey);
+                    this.tcpConnections.push(tcpObject);
+                    tcpObject.connect();
                 }
             }else{
                 //@ts-ignore
-                this.tcpConnections.push(new tcp(options.tcpConnections.adderess,options.tcpConnections.port,options.tcpConnections.secretKey));
+                const tcpObject=new tcp(options.tcpConnections.adderess,options.tcpConnections.port,options.tcpConnections.secretKey);
+                this.tcpConnections.push(tcpObject);
+                tcpObject.connect();
             }
         }
 
@@ -110,8 +114,6 @@ export class lid{
                 }
                 
             }else{
-                
-
                 const copy = new Map(tags.map(tag => [tag.tagName, tag]));
                 
                 for (const Logtag of LoggingLevel.tags) {
@@ -134,8 +136,17 @@ export class lid{
             }
         }
 
-        if(this.options.writeOnconsole){
+        if(this.options.writeOnconsole)
+        {
             this.writeconsole(LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingTags);
+        }
+        else if(this.files && !args.skipFileLog)
+        {
+            this.writefiles(LoggingLevel.lvlName,message,LoggingLevel.tags,args);
+        }
+        else if(this.tcpConnections && !args.skipConnectionLog)
+        {
+            this.writeConnection(LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingLevel.tags,args);
         }
     }
 
@@ -155,14 +166,17 @@ export class lid{
         }
     }
 
-    writefiles(lvlName:string,LvlColor:string,message:string,tags:tag[]=[],args:LogArgs){
+    writefiles(lvlName:string,message:string,tags:tag[]=[],args:LogArgs){
         if(!this.files){
             return;
         }
         
         if(this.isIterable(this.files)){
+
+            const ExcludedFiles=new Set(args.excludeFiles);
+
             for (const filePath of this.files) {
-                if(filePath===args.excludeFiles){continue};
+                if(ExcludedFiles.has(filePath)){continue};
                 //add files eclusion list here
                 if(filePath.slice(-3)==="txt"||filePath.slice(-3)==="log"){
                     this.WritefilesTxt(filePath,lvlName,message,tags,args.filesAppendMode);
@@ -450,8 +464,21 @@ export class lid{
         }
     }
 
-    writeConnection(){
+    writeConnection(lvlName:string,lvlColor:string,message:string,tags:tag[],args:LogArgs){
+        if(!this.tcpConnections){return};
+        
+        const ExcludedConnections=new Set(args.excludeConnections);
 
+        for (const tcpConnection of this.tcpConnections) {
+            if(ExcludedConnections.has(tcpConnection.address)){continue};
+
+            tcpConnection.sendData(JSON.stringify({
+                levelName:lvlName,
+                levelColor:lvlColor,
+                message,
+                tags
+            }));
+        }
     }
 
     private getRandomNumber(min:number=0, max:number=360) {

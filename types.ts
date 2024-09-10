@@ -45,5 +45,7 @@ export type Options = {
 export type LogArgs={
     excludeConnections?:string[]|string,
     excludeFiles?:string[]|string,
-    filesAppendMode?:boolean
+    filesAppendMode?:boolean,
+    skipFileLog:boolean,
+    skipConnectionLog:boolean
 }
