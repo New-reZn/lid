@@ -17,7 +17,7 @@ export class tcp{
         this.address = address; 
     }
 
-    connect() {
+    connect(Mics=(data:string)=>{}) {
         
         this.client.connect(this.port, this.address, () => {
             this.client.write(JSON.stringify({
@@ -29,6 +29,7 @@ export class tcp{
             const clientData=JSON.parse(data);
             this.IV=clientData.IV;
             this.opt=clientData.opt;
+            Mics(data);
         });
 
         this.client.on('close', () => {
@@ -39,11 +40,12 @@ export class tcp{
         });
     }
 
-    sendData(message:string,IV:string) {
+    async sendData(message:string,IV:string) {
         this.client.write(JSON.stringify({
             status:'sending message',
             message:this.encrypt(message,IV)
         }));
+        return true;
     }
 
     closeConnection() {
