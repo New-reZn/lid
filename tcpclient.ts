@@ -1,7 +1,6 @@
 import crypto from 'crypto'; 
 import { Socket } from 'node:net';
 
-
 export class tcp{
     client:Socket;
     port:number;
