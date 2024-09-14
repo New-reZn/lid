@@ -231,33 +231,33 @@ export default class lid{
 
                 const fileContentList=fileContent.split('\n');
                 
-                let fileContentListCursor=fileContentList.length;
+                let dateListCursor=fileContentList.length;
+                let timeListCursor=fileContentList.length;
                 
                 const latestDateRegex = /^\d{4}-\d{2}-\d{2}\u00A0:$/;
                 const latestTimeRegex  =/^\t\d{2}::\d{2}\u00A0:$/
                 let latestDateString:string;
                 let latestTimeString:string;
 
-                while(!latestDateRegex.test(fileContentList[fileContentListCursor])){   
-                    fileContentListCursor--;
-                    if(fileContentListCursor<0||fileContentListCursor>fileContentList.length){
+                while(!latestDateRegex.test(fileContentList[dateListCursor])){   
+                    dateListCursor--;
+                    if(dateListCursor<0||dateListCursor>fileContentList.length){
                         console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
                         return;
                     }
                 }
 
-                latestDateString=fileContentList[fileContentListCursor].slice(0,fileContentList[fileContentListCursor].length-2);
+                latestDateString=fileContentList[dateListCursor].slice(0,10);
 
-                while(!latestTimeRegex.test(fileContentList[fileContentListCursor])){
-                    fileContentListCursor++;
-                    if(fileContentListCursor<0||fileContentListCursor>fileContentList.length){
+                while(!latestTimeRegex.test(fileContentList[timeListCursor])){
+                    timeListCursor--;
+                    if(timeListCursor<0||timeListCursor>fileContentList.length){
                         console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
                         return;
                     }
                 }
                 
-
-                latestTimeString=fileContentList[fileContentListCursor].slice(0,fileContentList[fileContentListCursor].length-2);
+                latestTimeString=fileContentList[timeListCursor].slice(0,7);
 
                 const latestDateTime=new Date(latestDateString);
                 const [hours,minutes]=latestTimeString.split('::').map(Number);
@@ -302,7 +302,6 @@ export default class lid{
                     }
 
                     appendingData=appendingData.concat(' }\n');
-
                     
                 };
 
@@ -364,32 +363,33 @@ export default class lid{
                     return;
                 }
                 
-                let fileContentListCursor=fileContentList.length-1;
+                let dateContentListCursor=fileContentList.length-1;
+                let timeContentListCursor=fileContentList.length-1;
                 
                 const latestDateRegex = /^\d{4}-\d{2}-\d{2}\u00A0:$/;
                 const latestTimeRegex  =/^\d{2}::\d{2}\u00A0:$/
                 let latestDateString:string;
                 let latestTimeString:string;
 
-                while(!latestDateRegex.test(fileContentList[fileContentListCursor][0])){   
-                    fileContentListCursor--;
-                    if(fileContentListCursor<0||fileContentListCursor>fileContentList.length){
+                while(!latestDateRegex.test(fileContentList[dateContentListCursor][0])){   
+                    dateContentListCursor--;
+                    if(dateContentListCursor<0||dateContentListCursor>fileContentList.length){
                         console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
                         return;
                     }
                 }
 
-                latestDateString=fileContentList[fileContentListCursor][0].slice(0,10);
+                latestDateString=fileContentList[dateContentListCursor][0].slice(0,10);
 
-                while(!latestTimeRegex.test(fileContentList[fileContentListCursor][1])){
-                    fileContentListCursor++;
-                    if(fileContentListCursor<0||fileContentListCursor>fileContentList.length){
+                while(!latestTimeRegex.test(fileContentList[timeContentListCursor][1])){
+                    timeContentListCursor--;
+                    if(timeContentListCursor<0||timeContentListCursor>fileContentList.length){
                         console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
                         return;
                     }
                 }
                 
-                latestTimeString=fileContentList[fileContentListCursor][1].slice(0,10);
+                latestTimeString=fileContentList[timeContentListCursor][1].slice(0,10);
                 
                 const latestDateTime=new Date(latestDateString);
         
