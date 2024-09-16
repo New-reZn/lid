@@ -2,8 +2,8 @@ import {Level,Options,LevelArgs,tagArgs,tag,LogArgs} from './types.js';
 
 import chalk from 'chalk';
 import fs from 'fs';
-import { tcp } from './tcpclient.js';
-import {parse} from 'csv-parse';
+import { tcp } from './tcpClient.js';
+import {parse} from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 
 export default class lid{
@@ -345,131 +345,138 @@ export default class lid{
                 return;
             }
 
+            
             const csvData=fs.readFileSync(filePath,{encoding:'utf-8'});
-
+            
             if(csvData.length===0){
                 this.WritefilesCSV(filePath,levelName,message,tags,false);
                 return;
             }
+            
+            let fileContentList:string[][];
+            try{
+                console.time('csv read:');
+                fileContentList=parse(csvData, {
+                    delimiter: ',',
+                    columns: false,
+                    relax_column_count: true
+                });
+                console.timeEnd('csv read:')
+                
+            }catch(err){
+                console.error('Lid Logger error (id):Error parsing CSV data due to', err);
+                return;
+            }
 
-            parse(csvData, {
-                delimiter: ',',
-                columns: false,
-                relax_column_count: true
-            }, (err, fileContentList:string[][]) => {
+            
+            let dateContentListCursor=fileContentList.length-1;
+            let timeContentListCursor=fileContentList.length-1;
+            
+            const latestDateRegex = /^\d{4}-\d{2}-\d{2}\u00A0:$/;
+            const latestTimeRegex  =/^\d{2}::\d{2}\u00A0:$/
+            let latestDateString:string;
+            let latestTimeString:string;
 
-                if (err) {
-                    console.error('Lid Logger error (id):Error parsing CSV data due to', err);
+            while(!latestDateRegex.test(fileContentList[dateContentListCursor][0])){   
+                dateContentListCursor--;
+                if(dateContentListCursor<0||dateContentListCursor>fileContentList.length){
+                    console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
                     return;
                 }
-                
-                let dateContentListCursor=fileContentList.length-1;
-                let timeContentListCursor=fileContentList.length-1;
-                
-                const latestDateRegex = /^\d{4}-\d{2}-\d{2}\u00A0:$/;
-                const latestTimeRegex  =/^\d{2}::\d{2}\u00A0:$/
-                let latestDateString:string;
-                let latestTimeString:string;
+            }
 
-                while(!latestDateRegex.test(fileContentList[dateContentListCursor][0])){   
-                    dateContentListCursor--;
-                    if(dateContentListCursor<0||dateContentListCursor>fileContentList.length){
-                        console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
-                        return;
-                    }
+            latestDateString=fileContentList[dateContentListCursor][0].slice(0,10);
+
+            while(!latestTimeRegex.test(fileContentList[timeContentListCursor][1])){
+                timeContentListCursor--;
+                if(timeContentListCursor<0||timeContentListCursor>fileContentList.length){
+                    console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
+                    return;
                 }
-
-                latestDateString=fileContentList[dateContentListCursor][0].slice(0,10);
-
-                while(!latestTimeRegex.test(fileContentList[timeContentListCursor][1])){
-                    timeContentListCursor--;
-                    if(timeContentListCursor<0||timeContentListCursor>fileContentList.length){
-                        console.error(`Lid Logger error (id): cannot parse file at : ${filePath}`);
-                        return;
-                    }
-                }
-                
-                latestTimeString=fileContentList[timeContentListCursor][1].slice(0,10);
-                
-                const latestDateTime=new Date(latestDateString);
-        
-                const [hours,minutes]=[parseInt(latestTimeString.slice(0,2)),parseInt(latestTimeString.slice(4,6))];
-                latestDateTime.setHours(hours);
-                latestDateTime.setMinutes(minutes);
-
-                const currentDateTime=new Date();
-
-                let appendingData:string[][];
-
-                if(currentDateTime.getDate()===latestDateTime.getDate()){
-                    if(currentDateTime.getHours()===latestDateTime.getHours()){
-                        //same time
-                        appendingData=[['','',currentDateTime.toISOString(),levelName,message]];
-
-                        if(tags.length){
-                            appendingData.push(['','','','tag','tag message'])
-                            
-                            for (const tag of tags) {
-                                if(tag.tagMessage){
-                                    appendingData.push(['','','',tag.tagName,tag.tagMessage]);
-                                }else{
-                                    appendingData.push(['','','',tag.tagName]);
-                                }
-                            }
-                        
-                        }
+            }
             
-                    }else{
-                        //different time
-                        appendingData=[
-                                            ['',`${currentDateTime.getHours()}::${currentDateTime.getMinutes()}\u00A0:`],
-                                            ['','',currentDateTime.toISOString(),levelName,message]
-                                        ];
+            latestTimeString=fileContentList[timeContentListCursor][1].slice(0,10);
+            
+            const latestDateTime=new Date(latestDateString);
+    
+            const [hours,minutes]=[parseInt(latestTimeString.slice(0,2)),parseInt(latestTimeString.slice(4,6))];
+            // console.log("time",hours,minutes);
+            latestDateTime.setHours(hours);
+            latestDateTime.setMinutes(minutes);
 
-                        if(tags.length){
-                            appendingData.push(['','','','tag','tag message'])
-                            
-                            for (const tag of tags) {
-                                if(tag.tagMessage){
-                                    appendingData.push(['','','',tag.tagName,tag.tagMessage]);
-                                }else{
-                                    appendingData.push(['','','',tag.tagName]);
-                                }
-                            }
-                        }
-                        
-                    }
-                }else{
-                    // with in different date
-                    appendingData=[
-                                        [`${currentDateTime.getFullYear()}-${currentDateTime.getMonth().toString().padStart(2,'0')}-${currentDateTime.getDate().toString().padStart(2,'0')}\u00A0:`],
-                                        ['',`${currentDateTime.getHours()}::${currentDateTime.getMinutes().toString().padStart(2,'0')}\u00A0:`],
-                                        ['','',currentDateTime.toISOString(),levelName,message]
-                                    ];
+            const currentDateTime=new Date();
+
+            let appendingData:string[][];
+
+            if(currentDateTime.getDate()===latestDateTime.getDate()){
+                console.log(fileContentList.length,currentDateTime.getHours(),latestDateTime.getHours());
+                if(currentDateTime.getHours()===latestDateTime.getHours()){
+                    //same time
+                    appendingData=[['','',currentDateTime.toISOString(),levelName,message]];
 
                     if(tags.length){
                         appendingData.push(['','','','tag','tag message'])
-                    
+                        
                         for (const tag of tags) {
                             if(tag.tagMessage){
                                 appendingData.push(['','','',tag.tagName,tag.tagMessage]);
                             }else{
                                 appendingData.push(['','','',tag.tagName]);
                             }
-                        }   
-                    }
-                        
-                };
+                        }
                     
-                const output=stringify(appendingData);
-                
-                try {
-                    fs.appendFileSync(filePath, output,{flush:true});
-                } catch (error) {
-                    console.error(`Lid Logger error (id): cannot append file at : ${filePath} due to :\n ${error}`);
-                }
+                    }
+        
+                }else{
+                    //different time
+                    // console.log(currentDateTime.getHours(),latestDateTime.getHours());
+                    appendingData=[
+                                        ['',`${currentDateTime.getHours()}::${currentDateTime.getMinutes()}\u00A0:`],
+                                        ['','',currentDateTime.toISOString(),levelName,message]
+                                    ];
 
-            });
+                    if(tags.length){
+                        appendingData.push(['','','','tag','tag message'])
+                        
+                        for (const tag of tags) {
+                            if(tag.tagMessage){
+                                appendingData.push(['','','',tag.tagName,tag.tagMessage]);
+                            }else{
+                                appendingData.push(['','','',tag.tagName]);
+                            }
+                        }
+                    }
+                    
+                }
+            }else{
+                // with in different date
+                appendingData=[
+                                    [`${currentDateTime.getFullYear()}-${currentDateTime.getMonth().toString().padStart(2,'0')}-${currentDateTime.getDate().toString().padStart(2,'0')}\u00A0:`],
+                                    ['',`${currentDateTime.getHours()}::${currentDateTime.getMinutes().toString().padStart(2,'0')}\u00A0:`],
+                                    ['','',currentDateTime.toISOString(),levelName,message]
+                                ];
+
+                if(tags.length){
+                    appendingData.push(['','','','tag','tag message'])
+                
+                    for (const tag of tags) {
+                        if(tag.tagMessage){
+                            appendingData.push(['','','',tag.tagName,tag.tagMessage]);
+                        }else{
+                            appendingData.push(['','','',tag.tagName]);
+                        }
+                    }   
+                }
+                    
+            };
+            
+            
+            const output=stringify(appendingData);
+            try {
+                fs.appendFileSync(filePath, output,{flush:true});
+            } catch (error) {
+                console.error(`Lid Logger error (id): cannot append file at : ${filePath} due to :\n ${error}`);
+            }
 
         }else{
             const currentDateTime=new Date();
@@ -491,8 +498,9 @@ export default class lid{
                 }
             }
 
+            console.time('cswrite')
             const output=stringify(appendingData);
-            
+            console.timeEnd('cswrite')
             try{
                 fs.writeFileSync(filePath, output,{flush:true});
             }catch(error){
