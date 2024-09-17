@@ -528,3 +528,6 @@ export default class lid{
     }
 
 }
+
+export {lidServer} from './tcpServer.js';
+export {tcp} from './tcpClient.js';

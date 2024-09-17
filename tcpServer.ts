@@ -7,43 +7,57 @@ export class lidServer{
     server:net.Server;
     private serverIV='';
     private secretkey:string;
-    testoption;
-    Misc:(data:string)=>void
+    options;
 
-    constructor(port:number, address:string,secretkey:string,Misc:(data:string)=>void,testoption:any) {
+    Misc:(data:string)=>void=()=>{};
+    serverCallback:()=>void=()=>{
+        console.log('lid server is running...');
+    }
+
+    constructor(port:number, address:string,secretkey:string,Misc?:(data:string)=>void,serverCallback?:()=>void,option?:any) {
         this.port= port;
         this.address=address;
         this.server= net.createServer(this.handleconnection.bind(this))
         this.serverIV=crypto.randomBytes(16).toString('hex');
         this.secretkey=secretkey;
-        this.Misc=Misc;
-        this.testoption=testoption;
+        this.Misc=Misc??this.Misc;
+        this.serverCallback=serverCallback??this.serverCallback;
+        this.options=option;
+        this.server.listen(this.port,this.address,this.serverCallback);
     }
 
     handleconnection(socket: net.Socket){
             socket.on('data',(data:string)=>{
-                const clientData=JSON.parse(data);
-                if(clientData.status==='connected'){
+                
+                const clientData=JSON.parse(data.toString());
+
+                if(clientData.status==='connected')
+                {
                     socket.write(JSON.stringify({
                         IV:this.serverIV,
-                        opt:this.testoption
+                        opt:this.options
                     }));
-                }else if(clientData.status==='sending message'){
-                    try{
+                }
+                else if(clientData.status==='sending message')
+                {
+                    try
+                    {
                         this.Misc(this.decrypt(clientData.message,this.serverIV));
-                    }catch(e){
-
+                    }
+                    catch(e)
+                    {
+                        console.error(`Lid Error(id) : lid server crashed while running 'Misc' function`);   
                     }
                 }
             });
 
-            socket.on('end',()=>{
+            // socket.on('end',()=>{
 
-            })
+            // })
 
-            socket.on('close',()=>{
+            // socket.on('close',()=>{
 
-            })
+            // })
     }
 
     readata(data:string){
