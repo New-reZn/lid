@@ -1,3 +1,5 @@
+import type { tcp } from "tcpClient.ts";
+
 export type tag = {
     tag: number,
     tagName: string,
@@ -43,9 +45,16 @@ export type Options = {
 };
 
 export type LogArgs={
-    excludeConnections?:string[]|string,
+    excludeAddresses?:string[]|string,
+    excludePorts?:string[]|string,
     excludeFiles?:string[]|string,
     filesAppendMode?:boolean,
-    skipFileLog:boolean,
-    skipConnectionLog:boolean
+    skipFileLog?:boolean,
+    skipConnectionLog?:boolean,
+
 }
+
+export type tcpConnection={
+    [connectionAdress:string]:tcp
+}
+

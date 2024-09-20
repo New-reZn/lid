@@ -5,7 +5,7 @@ export class tcp{
     client:Socket;
     port:number;
     address:string;
-    secretKey:string;
+    private secretKey:string;
     IV:string='';
     opt:any=null;
 
@@ -16,47 +16,52 @@ export class tcp{
         this.address = address; 
     }
 
-    connect(Mics=(data?:string)=>{}) {   
-        this.client.connect(this.port, this.address, () => 
-        {
-            this.client.write(JSON.stringify({
-                status:'connected'
-            }));
+    async connect(Mics = (data?: string) => {}): Promise<this> {
+        this.client.connect(this.port, this.address, () => {
+            this.client.write(`|\n|${JSON.stringify({
+                status: 'connected'
+            })}|\n|`);
         });
 
-        this.client.on('data', (data:Uint8Array) => 
-        {
-            const clientData=JSON.parse(data.toString());
-            this.IV=clientData.IV;
-            this.opt=clientData.opt;
-            Mics(data.toString()??undefined);
-        });
+        try {
+            await new Promise<void>((resolve, reject) => {
+                this.client.on('data', (data: Uint8Array) => {
+                    try {
+                        const clientData = JSON.parse(data.toString());
+                        this.IV = clientData.IV;
+                        this.opt = clientData.opt;
+                        Mics(data.toString() ?? undefined);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
 
-        this.client.on('close', () => 
-        {
-            this.client.write(JSON.stringify({status:'disconnecting'}));
-        });
+                this.client.on('error', (error) => {
+                    console.error(`lid connection error (id): trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
+                    reject(error);
+                });
+            });
 
-        this.client.on('error', (error) => {
-            console.error(`lid connection error (id): trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
-        });
-        
-        return this;
+            return this;
+        } catch (error) {
+            throw new Error(`Failed to connect: ${error}`);
+        }
     }
 
     sendData(message:string) {
         if(!this.IV){
             console.error('lid connection error (id): lid server did not sent key for communication');
-            return;
+            return this;
         }
 
         try {
-            this.client.write(JSON.stringify(
+            this.client.write(`|\n|${JSON.stringify(
                 {
                 status:'sending message',
                 message:this.encrypt(message,this.IV)
                 }
-            ));
+            )}|\n|`);
         } catch (error) {
             console.error(`lid connection error : trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
         }
@@ -65,11 +70,10 @@ export class tcp{
     }
 
     closeConnection(destroyConnection?:boolean) {
-        this.client.write(JSON.stringify(
+        this.client.write(`|\n|${JSON.stringify(
         {
             status:'closing connection'
-        }
-        ));
+        })}|\n|`);
         
         this.IV=``;
         if(destroyConnection){

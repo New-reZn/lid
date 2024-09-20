@@ -29,26 +29,31 @@ export class lidServer{
     handleconnection(socket: net.Socket){
             socket.on('data',(data:string)=>{
                 
-                const clientData=JSON.parse(data.toString());
+                const clientDataStream=data.toString().split('|\n|');
 
-                if(clientData.status==='connected')
-                {
-                    socket.write(JSON.stringify({
-                        IV:this.serverIV,
-                        opt:this.options
-                    }));
-                }
-                else if(clientData.status==='sending message')
-                {
-                    try
-                    {
-                        this.Misc(this.decrypt(clientData.message,this.serverIV));
+                clientDataStream.forEach((clientMessage)=>{
+                    if(clientMessage.trim()){
+                        const clientData=JSON.parse(clientMessage);
+                        if(clientData.status==='connected')
+                        {
+                            socket.write(JSON.stringify({
+                                IV:this.serverIV,
+                                opt:this.options
+                            }));
+                        }
+                        else if(clientData.status==='sending message')
+                        {
+                            try
+                            {
+                                this.Misc(this.decrypt(clientData.message,this.serverIV));
+                            }
+                            catch(e)
+                            {
+                                console.error(`Lid Error(id) : lid server crashed while running 'Misc' function`);   
+                            }
+                        }
                     }
-                    catch(e)
-                    {
-                        console.error(`Lid Error(id) : lid server crashed while running 'Misc' function`);   
-                    }
-                }
+                })
             });
 
             // socket.on('end',()=>{

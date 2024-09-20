@@ -1,4 +1,4 @@
-import {Level,Options,LevelArgs,tagArgs,tag,LogArgs} from './types.js';
+import type {Level,Options,LevelArgs,tagArgs,tag,LogArgs,tcpConnection} from './types.js';
 
 import chalk from 'chalk';
 import fs from 'fs';
@@ -8,9 +8,9 @@ import { stringify } from 'csv-stringify/sync';
 export default class lid{
     private levels:Level[];
     LevelCount:number=0;
-    private options:Options;
-    private tcpConnections;
-    private files:string|string[]='';
+    options:Options;
+    tcpConnections:tcpConnection={};
+    files:string|string[]='';
 
     constructor(level:LevelArgs[],options:Options={}){
         
@@ -51,19 +51,17 @@ export default class lid{
         this.options.writeOnconsole=options.writeOnconsole??true;
 
         if(options.tcpConnections){
-            this.tcpConnections=[];
-            if(this.isIterable(options)){
+            if(this.isIterable(options.tcpConnections)){
                 //@ts-ignore
                 for (const tcpConnection of options.tcpConnections) {
                     const tcpObject=new tcp(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey);
-                    this.tcpConnections.push(tcpObject);
-                    tcpObject.connect();
+                    this.tcpConnections[`${tcpConnection.adderess}::${tcpConnection.port}`]=tcpObject;
                 }
             }else{
                 //@ts-ignore
                 const tcpObject=new tcp(options.tcpConnections.adderess,options.tcpConnections.port,options.tcpConnections.secretKey);
-                this.tcpConnections.push(tcpObject);
-                tcpObject.connect();
+                //@ts-ignore
+                this.tcpConnections[`${options.tcpConnections.adderess}::${options.tcpConnections.port}`]=tcpObject;   
             }
         }
 
@@ -74,7 +72,6 @@ export default class lid{
                 this.files=[...options.files];
             }
         }
-
     }
     
     addlevel(){}
@@ -83,26 +80,35 @@ export default class lid{
     addtag(){}
     removetag(){}
 
-    log(level:number|string,message:string,tags:tagArgs[]|undefined=undefined,args:LogArgs,){
+    async initializeConnections(){
+        for (const connection of Object.values(this.tcpConnections)) {
+            await connection.connect();
+        }
+    }
+
+    log(level:number|string,message:string,tags:tagArgs[]|undefined=undefined,args?:LogArgs,){
+        const dateTime=new Date();
+        
         if(!args){
             args={
-                excludeConnections:[],
+                excludeAddresses:[],
                 excludeFiles:[],
                 skipConnectionLog:false,
                 skipFileLog:false,
-                filesAppendMode:true
+                filesAppendMode:true,
+                excludePorts:[],
             }
         }
 
         let LoggingLevel:Level|undefined;
-            for (const levels of this.levels) {
-                if(typeof level==="number"){
-                    if(levels.level===level){
-                        LoggingLevel=structuredClone(levels);
-                    }
-                }else if(typeof level==="string"){
-                    if(levels.lvlName===level){
-                        LoggingLevel=structuredClone(levels);
+        for (const levels of this.levels) {
+            if(typeof level==="number"){
+                if(levels.level===level){
+                    LoggingLevel=structuredClone(levels);
+                }
+            }else if(typeof level==="string"){
+                if(levels.lvlName===level){
+                    LoggingLevel=structuredClone(levels);
                 }
             }
         }
@@ -113,6 +119,7 @@ export default class lid{
         }
 
         let LoggingTags:tag[]=[];
+
         if(tags){
             if(!LoggingLevel.tags.length && LoggingLevel.tagsCount===0){
                 for (const UserTags of tags) {
@@ -128,10 +135,16 @@ export default class lid{
             }else{
                 const copy = new Map(tags.map(tag => [tag.tagName, tag]));
                 
-                for (const Logtag of LoggingLevel.tags) {
-                    if (copy.has(Logtag.tagName)) {
-                        LoggingTags.push(Logtag);
-                        copy.delete(Logtag.tagName);
+                for (const logTag of LoggingLevel.tags) {
+                    if (copy.has(logTag.tagName)) {
+                        
+                        const tag=copy.get(logTag.tagName);
+                        if(tag?.tagMessage){
+                            logTag.tagMessage=tag.tagMessage;
+                        }
+
+                        LoggingTags.push(logTag);
+                        copy.delete(logTag.tagName);
                     }
                 }
 
@@ -149,23 +162,23 @@ export default class lid{
 
         if(this.options.writeOnconsole)
         {
-            this.writeconsole(LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingTags);
+            this.writeconsole(dateTime,LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingTags);
         }
         
         if(this.files.length && !args.skipFileLog)
         {
-            this.writefiles(LoggingLevel.lvlName,message,LoggingTags,args);
+            this.writefiles(dateTime,LoggingLevel.lvlName,message,LoggingTags,args);
         }
         
-        if(this.tcpConnections?.length && !args.skipConnectionLog)
+        if(Object.keys(this.tcpConnections).length && !args.skipConnectionLog)
         {
-            this.writeConnection(LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingTags,args);
+            this.writeConnection(dateTime,LoggingLevel.lvlName,LoggingLevel.level,LoggingLevel.lvlcolor,message,LoggingTags,args);
         }
     }
 
-    writeconsole(lvlName:string,LvlColor:string,message:string,tags:tag[]=[]){
+    writeconsole(currentDateTime:Date,lvlName:string,LvlColor:string,message:string,tags:tag[]=[]){
         console.log(
-            `[${new Date().toISOString()}] :`,
+            `[${currentDateTime.toISOString()}] :`,
             chalk.bgHex(LvlColor).black(lvlName.toUpperCase()),
             chalk.hex(LvlColor)(message),
         );
@@ -179,43 +192,44 @@ export default class lid{
         }
     }
 
-    writefiles(lvlName:string,message:string,tags:tag[]=[],args:LogArgs){
+    writefiles(currentDateTime:Date,lvlName:string,message:string,tags:tag[]=[],args:LogArgs){
         if(!this.files){
             return;
         }
         
         if(this.isIterable(this.files)){
 
-            const ExcludedFiles=new Set(args.excludeFiles);
+            const ExcludedFiles=new Set(args.excludeFiles??[]);
 
             for (const filePath of this.files) {
                 if(ExcludedFiles.has(filePath)){continue};
                 //add files exclusion list here
                 if(filePath.slice(-3)==="txt"||filePath.slice(-3)==="log"){
-                    this.WritefilesTxt(filePath,lvlName,message,tags,args.filesAppendMode);
+                    this.WritefilesTxt(currentDateTime,filePath,lvlName,message,tags,args.filesAppendMode);
                 }else if(filePath.slice(-3)==="csv"){
-                    this.WritefilesCSV(filePath,lvlName,message,tags,args.filesAppendMode);
+                    this.WritefilesCSV(currentDateTime,filePath,lvlName,message,tags,args.filesAppendMode);
                 }
             }
         }else{
             if(this.files.slice(-3)==="txt"||this.files.slice(-3)==="log"){
                 //@ts-ignore
-                this.WritefilesTxt(this.files,lvlName,message,tags,args.filesAppendMode);
+                this.WritefilesTxt(currentDateTime,this.files,lvlName,message,tags,args.filesAppendMode);
             }else if(this.files.slice(-3)==="csv"){
                 //@ts-ignore
-                this.WritefilesCSV(this.files,lvlName,message,tags,args.filesAppendMode);                
+                this.WritefilesCSV(currentDateTime,this.files,lvlName,message,tags,args.filesAppendMode);                
             }
         }
         
     }
     
     //TODO:add mode to cahce lated date and time postion at top row of file
-    private WritefilesTxt(filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
+    private WritefilesTxt(currentDateTime:Date,filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
+        
         if(filesAppendMode){
             try{
                 if(!fs.existsSync(filePath)){
                    
-                    this.WritefilesTxt(filePath,levelName,message,tags,false);
+                    this.WritefilesTxt(currentDateTime,filePath,levelName,message,tags,false);
                     return;
                 }
 
@@ -224,7 +238,7 @@ export default class lid{
                 const fileContent=fileCurrentdata;
 
                 if(fileContent.length===0){
-                    this.WritefilesTxt(filePath,levelName,message,tags,false);
+                    this.WritefilesTxt(currentDateTime,filePath,levelName,message,tags,false);
                     return;
                 }
 
@@ -262,9 +276,7 @@ export default class lid{
                 const [hours,minutes]=latestTimeString.split('::').map(Number);
                 latestDateTime.setHours(hours);
                 latestDateTime.setMinutes(minutes);
-                
-                const currentDateTime=new Date();
-                    
+            
                 let appendingData:string;
                 
                 //within same date
@@ -337,17 +349,17 @@ export default class lid{
         }
     }
 
-    private WritefilesCSV(filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
+    private WritefilesCSV(currentDateTime:Date,filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
         if(filesAppendMode){
             if(!fs.existsSync(filePath)){
-                this.WritefilesCSV(filePath,levelName,message,tags,false);
+                this.WritefilesCSV(currentDateTime,filePath,levelName,message,tags,false);
                 return;
             }
 
             const csvData=fs.readFileSync(filePath,{encoding:'utf-8'});
 
             if(csvData.length===0){
-                this.WritefilesCSV(filePath,levelName,message,tags,false);
+                this.WritefilesCSV(currentDateTime,filePath,levelName,message,tags,false);
                 return;
             }
             
@@ -393,8 +405,6 @@ export default class lid{
             const [hours,minutes]=[parseInt(latestTimeString.slice(0,2)),parseInt(latestTimeString.slice(4,6))];
             latestDateTime.setHours(hours);
             latestDateTime.setMinutes(minutes);
-
-            const currentDateTime=new Date();
 
             let appendingData:string;
 
@@ -490,21 +500,40 @@ export default class lid{
         }
     }
 
-    writeConnection(lvlName:string,lvlColor:string,message:string,tags:tag[],args:LogArgs){
+    writeConnection(currentDateTime:Date,lvlName:string,level:number,lvlColor:string,message:string,tags:tag[],args:LogArgs){
         if(!this.tcpConnections){return};
-        
-        const ExcludedConnections=new Set(args.excludeConnections);
 
-        for (const tcpConnection of this.tcpConnections) {
-            if(ExcludedConnections.has(tcpConnection.address)){continue};
-
-            tcpConnection.sendData(JSON.stringify({
-                levelName:lvlName,
-                levelColor:lvlColor,
-                message,
-                tags
-            }));
+        if(!this.isIterable(typeof args.excludeAddresses)){
+            //@ts-ignore
+            args.excludeAddresses=[args.excludeAddresses]
         }
+
+        if(!this.isIterable(typeof args.excludePorts)){
+            //@ts-ignore
+            args.excludePorts=[args.excludePorts]
+        }
+        
+        const ExcludedAdderesses=new Set(args.excludeAddresses??[]);
+        const ExcludedPort=new Set(args.excludePorts??[]);
+
+        for (const tcp of Object.keys(this.tcpConnections)) {
+            const connectionKey=tcp.split('::');
+            
+            if(ExcludedAdderesses.has(connectionKey[0]) || ExcludedPort.has(connectionKey[1])){continue}
+            
+            if(this.tcpConnections[tcp].IV){
+                this.tcpConnections[tcp].sendData(JSON.stringify({
+                    LogTime:currentDateTime.toISOString(),
+                    lvlName,
+                    level,
+                    lvlColor,
+                    message,
+                    tags
+                }));
+            }else{
+                console.error(`Lid connection error (id): Could not connect to connection ${tcp}`);
+            }
+        }            
     }
 
     private getRandomNumber(min:number=0, max:number=360) {
