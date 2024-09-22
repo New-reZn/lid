@@ -22,31 +22,28 @@ export class LidClient{
                 status: 'connected'
             })}|\n|`);
         });
-
-        try {
-            await new Promise<void>((resolve, reject) => {
-                this.client.on('data', (data: Uint8Array) => {
-                    try {
-                        const clientData = JSON.parse(data.toString());
-                        this.IV = clientData.IV;
-                        this.opt = clientData.opt;
-                        Mics(data.toString() ?? undefined);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                });
-
-                this.client.on('error', (error) => {
-                    console.error(`lid connection error (id): trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
+    
+        await new Promise<void>((resolve, reject) => {
+            this.client.on('data', (data: Uint8Array) => {
+                try {
+                    const clientData = JSON.parse(data.toString());
+                    this.IV = clientData.IV;
+                    this.opt = clientData.opt;
+                    Mics(data.toString() ?? undefined);
+                    resolve();
+                } catch (error) {
                     reject(error);
-                });
+                }
             });
 
-            return this;
-        } catch (error) {
-            throw new Error(`Failed to connect: ${error}`);
-        }
+            this.client.on('error', (error) => {
+                console.error(`lid connection error (id): trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
+                reject(error);
+            });
+        });
+
+        return this;
+        
     }
 
     sendData(message:string) {

@@ -58,3 +58,7 @@ export type tcpConnection={
     [connectionAdress:string]:LidClient
 }
 
+export type ClientData={
+    status:string,
+    message?:string
+}

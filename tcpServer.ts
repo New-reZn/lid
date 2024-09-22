@@ -1,5 +1,6 @@
 import net from 'net';
 import crypto from 'crypto';
+import { ClientData } from 'types.js';
 
 export class lidServer{
     port:number;
@@ -26,34 +27,42 @@ export class lidServer{
         this.server.listen(this.port,this.address,this.serverCallback);
     }
 
+    handleMessage(socket:net.Socket,clientData:ClientData){
+        if(clientData.status==='connected'){
+                socket.write(JSON.stringify({
+                    IV:this.serverIV,
+                    opt:this.options
+                }));
+        }
+        else if(clientData.status==='sending message'){
+            try
+            {
+                this.Misc(JSON.parse(this.decrypt(clientData.message??'',this.serverIV)));
+            }
+            catch(e)
+            {
+                console.error(`Lid Error(id) : lid server crashed while parsing client message`);   
+            }
+        }
+    }
+
+    handleData(socket:net.Socket,data:string){
+        
+        const clientDataStream=data.toString().split('|\n|');
+
+        clientDataStream.forEach((clientMessage)=>{
+            if(!clientMessage.trim()){
+                return;
+            }
+
+            const clientData=JSON.parse(clientMessage) as ClientData;
+            this.handleMessage(socket,clientData);
+        })
+    }
+
     handleconnection(socket: net.Socket){
             socket.on('data',(data:string)=>{
-                
-                const clientDataStream=data.toString().split('|\n|');
-
-                clientDataStream.forEach((clientMessage)=>{
-                    if(clientMessage.trim()){
-                        const clientData=JSON.parse(clientMessage);
-                        if(clientData.status==='connected')
-                        {
-                            socket.write(JSON.stringify({
-                                IV:this.serverIV,
-                                opt:this.options
-                            }));
-                        }
-                        else if(clientData.status==='sending message')
-                        {
-                            try
-                            {
-                                this.Misc(JSON.parse(this.decrypt(clientData.message,this.serverIV)));
-                            }
-                            catch(e)
-                            {
-                                console.error(`Lid Error(id) : lid server crashed while running 'Misc' function`);   
-                            }
-                        }
-                    }
-                })
+                this.handleData(socket,data);
             });
 
             // socket.on('end',()=>{
