@@ -45,7 +45,7 @@ export class lidServer{
                         {
                             try
                             {
-                                this.Misc(this.decrypt(clientData.message,this.serverIV));
+                                this.Misc(JSON.parse(this.decrypt(clientData.message,this.serverIV)));
                             }
                             catch(e)
                             {

@@ -1,7 +1,7 @@
 import crypto from 'crypto'; 
 import { Socket } from 'node:net';
 
-export class tcp{
+export class LidClient{
     client:Socket;
     port:number;
     address:string;

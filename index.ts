@@ -2,10 +2,11 @@ import type {Level,Options,LevelArgs,tagArgs,tag,LogArgs,tcpConnection} from './
 
 import chalk from 'chalk';
 import fs from 'fs';
-import { tcp } from './tcpClient.js';
+import { LidClient } from './tcpClient.js';
 import { stringify } from 'csv-stringify/sync';
 
 export default class lid{
+    //TODO:Make level a set
     private levels:Level[];
     LevelCount:number=0;
     options:Options;
@@ -14,36 +15,36 @@ export default class lid{
 
     constructor(level:LevelArgs[],options:Options={}){
         
-        if(level){
-            this.levels=[];
-            for(const i of level){
-                
-                const level:Level={
-                    level:i.level??this.LevelCount,
-                    lvlName:i.lvlName,
-                    lvlcolor:this.hslToHex(this.getRandomNumber(),100,50),
-                    tags:[],
-                    tagsCount:0
-                }
-    
-                if(i.tags){
-                    for(const j of i.tags){
-                        level.tags.push({
-                            isDynamic:false,
-                            tag:j.tag??level.tagsCount,
-                            tagcolor:this.hslToHex(this.getRandomNumber(),100,50),
-                            tagMessage:j.tagMessage,
-                            tagName:j.tagName
-                        })
-                        level.tagsCount++;
-                    }
-                }
-    
-                this.levels.push(level);
-                this.LevelCount++;
+        if(!level){
+            throw new Error('Lid Logger error (id): No levels were defined');
+        }
+
+        this.levels=[];
+        for(const i of level){
+            
+            const level:Level={
+                level:i.level??this.LevelCount,
+                lvlName:i.lvlName,
+                lvlcolor:this.hslToHex(this.getRandomNumber(),100,50),
+                tags:[],
+                tagsCount:0
             }
-        }else{
-            throw new Error('Lid Logger error (id): No levels were defined')
+
+            if(i.tags){
+                for(const j of i.tags){
+                    level.tags.push({
+                        isDynamic:false,
+                        tag:j.tag??level.tagsCount,
+                        tagcolor:this.hslToHex(this.getRandomNumber(),100,50),
+                        tagMessage:j.tagMessage,
+                        tagName:j.tagName
+                    })
+                    level.tagsCount++;
+                }
+            }
+
+            this.levels.push(level);
+            this.LevelCount++;
         }
      
         this.options=options;
@@ -54,12 +55,12 @@ export default class lid{
             if(this.isIterable(options.tcpConnections)){
                 //@ts-ignore
                 for (const tcpConnection of options.tcpConnections) {
-                    const tcpObject=new tcp(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey);
+                    const tcpObject=new LidClient(tcpConnection.adderess,tcpConnection.port,tcpConnection.secretKey);
                     this.tcpConnections[`${tcpConnection.adderess}::${tcpConnection.port}`]=tcpObject;
                 }
             }else{
                 //@ts-ignore
-                const tcpObject=new tcp(options.tcpConnections.adderess,options.tcpConnections.port,options.tcpConnections.secretKey);
+                const tcpObject=new LidClient(options.tcpConnections.adderess,options.tcpConnections.port,options.tcpConnections.secretKey);
                 //@ts-ignore
                 this.tcpConnections[`${options.tcpConnections.adderess}::${options.tcpConnections.port}`]=tcpObject;   
             }
@@ -559,4 +560,4 @@ export default class lid{
 }
 
 export {lidServer} from './tcpServer.js';
-export {tcp} from './tcpClient.js';
+export {LidClient} from './tcpClient.js';

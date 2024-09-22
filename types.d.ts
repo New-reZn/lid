@@ -1,4 +1,4 @@
-import type { tcp } from "tcpClient.ts";
+import type { LidClient } from "tcpClient.ts";
 
 export type tag = {
     tag: number,
@@ -55,6 +55,6 @@ export type LogArgs={
 }
 
 export type tcpConnection={
-    [connectionAdress:string]:tcp
+    [connectionAdress:string]:LidClient
 }
 
