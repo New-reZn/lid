@@ -10,7 +10,7 @@ export type tag = {
 
 export type Level = {
     lvlName: string,
-    lvlcolor: string,
+    lvlColor: string,
     level: number,
     tags: tag[],
     tagsCount: number
@@ -18,7 +18,7 @@ export type Level = {
 
 export type LevelArgs = {
     lvlName: string,
-    lvlcolor?: string,
+    lvlColor?: string,
     level?: number,
     tags?: tagArgs[]
 };
@@ -41,7 +41,9 @@ export type Options = {
         secretKey: string
     }[],
     files?: string | string[],
-    writeOnconsole?: boolean
+    writeOnconsole?: boolean,
+    bufferedConnection?:boolean,
+    bufferedTimeout?:number
 };
 
 export type LogArgs={
@@ -61,4 +63,14 @@ export type tcpConnection={
 export type ClientData={
     status:string,
     message?:string
+}
+
+export type LogEntry = {
+    currentDateTime: Date;
+    lvlName: string;
+    level: number;
+    lvlColor: string;
+    message: string;
+    tags: Tag[];
+    args: LogArgs;
 }

@@ -1,4 +1,4 @@
-import type {Level,Options,LevelArgs,tagArgs,tag,LogArgs,tcpConnection} from './types.js';
+import type {Level,Options,LevelArgs,tagArgs,tag,LogArgs,tcpConnection, LogEntry} from './types.js';
 
 import chalk from 'chalk';
 import fs from 'fs';
@@ -12,6 +12,8 @@ export default class lid{
     options:Options;
     tcpConnections:tcpConnection={};
     files:string|string[]='';
+    connectionBuffer:LogEntry[]=[];
+    interval:NodeJS.Timeout|undefined;
 
     constructor(level:LevelArgs[],options:Options={}){
         
@@ -21,7 +23,7 @@ export default class lid{
                 level.tags.push({
                     isDynamic:false,
                     tag:j.tag??level.tagsCount,
-                    tagcolor:this.hslToHex(this.getRandomNumber(),100,50),
+                    tagcolor:this.hslToHex(this.getColor(j.tagName),100,50),
                     tagMessage:j.tagMessage,
                     tagName:j.tagName
                 })
@@ -47,7 +49,7 @@ export default class lid{
             const level:Level={
                 level:i.level??this.LevelCount,
                 lvlName:i.lvlName,
-                lvlcolor:this.hslToHex(this.getRandomNumber(),100,50),
+                lvlColor:this.hslToHex(this.getColor(i.lvlName),100,50),
                 tags:[],
                 tagsCount:0
             }
@@ -80,6 +82,14 @@ export default class lid{
                 this.files=[...options.files];
             }
         }
+
+        if(this.options.bufferedConnection){
+            this.interval=setInterval(()=>{
+                const log=this.connectionBuffer.shift();
+                if(!log){return;}
+                this.writeConnection(log.currentDateTime,log.lvlName,log.level,log.lvlColor,log.message,log.tags,log.args);
+            },this.options.bufferedTimeout??10);
+        }
     }
     
     addlevel(){}
@@ -101,7 +111,7 @@ export default class lid{
                 LoggingTags.push({
                     isDynamic:true,
                     tag:LoggingLevel.tagsCount++,
-                    tagcolor:this.hslToHex(this.getRandomNumber(),100,50),
+                    tagcolor:this.hslToHex(this.getColor(tag.tagName),100,50),
                     tagName:tag.tagName,
                     tagMessage:tag.tagMessage
                 })
@@ -163,7 +173,7 @@ export default class lid{
 
         if(this.options.writeOnconsole)
         {
-            this.writeconsole(dateTime,LoggingLevel.lvlName,LoggingLevel.lvlcolor,message,LoggingTags);
+            this.writeconsole(dateTime,LoggingLevel.lvlName,LoggingLevel.lvlColor,message,LoggingTags);
         }
         
         if(this.files.length && !args.skipFileLog)
@@ -173,7 +183,11 @@ export default class lid{
         
         if(Object.keys(this.tcpConnections).length && !args.skipConnectionLog)
         {
-            this.writeConnection(dateTime,LoggingLevel.lvlName,LoggingLevel.level,LoggingLevel.lvlcolor,message,LoggingTags,args);
+            if(this.options.bufferedConnection){
+                this.writeConnectionBuffer(dateTime,LoggingLevel.lvlName,LoggingLevel.level,LoggingLevel.lvlColor,message,LoggingTags,args);
+            }else{
+                this.writeConnection(dateTime,LoggingLevel.lvlName,LoggingLevel.level,LoggingLevel.lvlColor,message,LoggingTags,args);
+            }
         }
     }
 
@@ -223,7 +237,7 @@ export default class lid{
         
     }
     
-    //TODO:add mode to cahce lated date and time postion at top row of file
+    //TODO:add mode to cahce latest date and time postion at top row of file
     private WritefilesTxt(currentDateTime:Date,filePath:string,levelName:string,message:string,tags:tag[],filesAppendMode=true){
         
         if(filesAppendMode){
@@ -533,8 +547,27 @@ export default class lid{
         }            
     }
 
-    private getRandomNumber(min:number=0, max:number=360) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
+    writeConnectionBuffer(currentDateTime:Date,lvlName:string,level:number,lvlColor:string,message:string,tags:tag[],args:LogArgs){
+        this.connectionBuffer.push({
+            currentDateTime,
+            level,
+            lvlName,
+            lvlColor,
+            message,
+            tags,
+            args,
+        })
+    }
+
+    private getColor(generator:String) {
+        let hash = 0;
+
+        for (let i = 0; i < generator.length; i++) {
+            hash = (hash << 3) - hash + generator.charCodeAt(i);
+        }
+
+        const angle = Math.abs(hash % 361);
+        return angle;
     }
 
     private hslToHex(h:number, s:number, l:number) {

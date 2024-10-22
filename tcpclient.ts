@@ -38,6 +38,7 @@ export class LidClient{
 
             this.client.on('error', (error) => {
                 console.error(`lid connection error (id): trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
+                this.IV="";
                 reject(error);
             });
         });
@@ -61,10 +62,12 @@ export class LidClient{
             )}|\n|`);
         } catch (error) {
             console.error(`lid connection error : trouble connecting to server at ${this.address}:${this.port} due to:\n ${error}`);
+            throw new Error();
         }
         
         return this;
     }
+
 
     closeConnection(destroyConnection?:boolean) {
         this.client.write(`|\n|${JSON.stringify(
