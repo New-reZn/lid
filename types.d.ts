@@ -4,7 +4,7 @@ export type tag = {
     tag: number,
     tagName: string,
     tagMessage?: string,
-    tagcolor: string,
+    tagColor: string,
     isDynamic: boolean
 };
 

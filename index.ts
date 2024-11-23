@@ -23,7 +23,7 @@ export default class lid{
                 level.tags.push({
                     isDynamic:false,
                     tag:j.tag??level.tagsCount,
-                    tagcolor:this.hslToHex(this.getColor(j.tagName),100,50),
+                    tagColor:this.hslToHex(this.getColor(j.tagName),100,50),
                     tagMessage:j.tagMessage,
                     tagName:j.tagName
                 })
@@ -111,7 +111,7 @@ export default class lid{
                 LoggingTags.push({
                     isDynamic:true,
                     tag:LoggingLevel.tagsCount++,
-                    tagcolor:this.hslToHex(this.getColor(tag.tagName),100,50),
+                    tagColor:this.hslToHex(this.getColor(tag.tagName),100,50),
                     tagName:tag.tagName,
                     tagMessage:tag.tagMessage
                 })
@@ -534,7 +534,7 @@ export default class lid{
             
             if(this.tcpConnections[tcp].IV){
                 this.tcpConnections[tcp].sendData(JSON.stringify({
-                    LogTime:currentDateTime.toISOString(),
+                    logTime:currentDateTime.getTime(),
                     lvlName,
                     level,
                     lvlColor,
