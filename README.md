@@ -105,8 +105,8 @@ const logger = new lid(
         }
     ], {
         files: [
-            'D:/Clone/python/lidLogger/lidtest/one.csv',
-            'D:/Clone/python/lidLogger/lidtest/one.txt',
+            'C:/one/two/three/lidtest/one.csv',
+            'C:/one/two/three/lidtest/one.txt',
         ],
         tcpConnections: [{
             address: '127.0.0.1',
